@@ -12,6 +12,8 @@ using System.Net.Sockets;
 using System.Net;
 using ListViewElement = System.Windows.Forms.VisualStyles.VisualStyleElement.ListView;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using System.Runtime.InteropServices;
+using System.Diagnostics;
 
 
 
@@ -24,18 +26,20 @@ namespace lab3
         public Form1()
         {
             InitializeComponent();
-           
-
+             
         }
 
-        private void Form1_Load(object sender, EventArgs e)
+    private void Form1_Load(object sender, EventArgs e)
         {
            
         }
 
-
+        private bool isThreadRunning = true;
         private bool isListening = false;
-
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            isThreadRunning = false;
+        }
         private void StartListen(object  sender, EventArgs e)
         {
             
@@ -51,10 +55,10 @@ namespace lab3
             listenerSocket.Bind(ipepServer);
             listenerSocket.Listen(-1);
             clientSocket = listenerSocket.Accept();
-            DisplayMessage("New client connected");
+            textBox1.Text = "New client connected\r";
 
 
-            while (clientSocket.Connected) 
+            while (clientSocket.Connected && isThreadRunning) 
             {
                 string text = "";
 
@@ -63,6 +67,11 @@ namespace lab3
                 {
                     bytesReceived = clientSocket.Receive(buffer);
                     text += Encoding.ASCII.GetString(buffer);
+                    if (isThreadRunning==false)
+                    {
+                        System.Diagnostics.Debugger.Break();
+                        break; 
+                    }
                     receivedData.Append(text);
                 } while(text[text.Length - 1]!='\n');
 
@@ -85,13 +94,15 @@ namespace lab3
             {
                 isListening = true;
 
-                DisplayMessage("Listening");
+                textBox1.Text = "Listening\r";
                 CheckForIllegalCrossThreadCalls = false;
                 Thread serverThread = new Thread(new ThreadStart(StartUnsafeThread));
                 serverThread.Start();
             }
 
         }
+
+       
 
         private void textBox1_TextChanged(object sender, EventArgs e)
         {
@@ -118,14 +129,18 @@ namespace lab3
 
         private void UpdateTextBox(string message)
         {
-            if (textBox1.InvokeRequired)
+            try
             {
-                textBox1.Invoke(new Action<string>(UpdateTextBox), message);
+                if (textBox1.InvokeRequired && isThreadRunning)
+                {
+                    textBox1.Invoke(new Action<string>(UpdateTextBox), message);
+                }
+                else
+                {
+                    textBox1.AppendText(message + Environment.NewLine);
+                }
             }
-            else
-            {
-                textBox1.AppendText(message + Environment.NewLine);
-            }
+            catch { }
         }
     }
 }
